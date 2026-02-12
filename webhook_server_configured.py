@@ -10,15 +10,21 @@ from flask import Flask, request, jsonify
 import json
 from datetime import datetime
 import requests
+import os
 
 # ═══════════════════════════════════════════════════════════════════════════
-# CONFIGURATION - YOUR CREDENTIALS
+# CONFIGURATION - SECURE WITH ENVIRONMENT VARIABLES
 # ═══════════════════════════════════════════════════════════════════════════
 
-# Telegram Settings
+# Telegram Settings - LOAD FROM ENVIRONMENT VARIABLES (SECURE!)
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
 
-TELEGRAM_CHAT_ID = "822044818"
+# Validate credentials are set
+if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+    print("⚠️ WARNING: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not set!")
+    print("Please set environment variables in Railway dashboard")
+    print("Variables tab → Add TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID")
 
 # ═══════════════════════════════════════════════════════════════════════════
 # TELEGRAM NOTIFICATION
