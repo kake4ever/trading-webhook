@@ -16,7 +16,8 @@ import requests
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Telegram Settings
-TELEGRAM_BOT_TOKEN = "8528037605:AAHozFFwqn43lN2F4mWP908dxAWXhM64X9E"
+TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+
 TELEGRAM_CHAT_ID = "822044818"
 
 # ═══════════════════════════════════════════════════════════════════════════
