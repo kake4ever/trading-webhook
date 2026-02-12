@@ -113,8 +113,7 @@ def format_signal(data: dict) -> str:
         vix_context = str(vix)
     
     # Format message
-    message = f"""
-{emoji} <b>{ticker} {action} SIGNAL</b> {emoji}
+    message = f"""{emoji} <b>{ticker} {action} SIGNAL</b> {emoji}
 
 <b>Direction:</b> {signal}
 <b>Confidence:</b> {confidence}/10 {'🔥' if confidence >= 9 else '✅' if confidence >= 8 else '⚠️'}
@@ -132,13 +131,12 @@ def format_signal(data: dict) -> str:
 
 <b>✅ TRADE PLAN:</b>
 1. Review chart on TradingView
-2. Check bid/ask spread (< $0.10 for SPY, < $0.20 for QQQ)
+2. Check bid/ask spread (&lt; $0.10 for SPY, &lt; $0.20 for QQQ)
 3. Enter if spread is tight
 4. Target: +50% (T1), +100% (T2)
 5. Stop: -30% or 1 day before exp
 
-<b>⏰ Time:</b> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-    """
+<b>⏰ Time:</b> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"""
     
     return message.strip()
 
