@@ -8,6 +8,8 @@ pip install flask requests
 
 from flask import Flask, request, jsonify
 import json
+import time
+import re
 from datetime import datetime
 import requests
 import os
@@ -30,39 +32,77 @@ if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
 # TELEGRAM NOTIFICATION
 # ═══════════════════════════════════════════════════════════════════════════
 
-def send_telegram(message: str) -> bool:
-    """Send message to Telegram"""
-    try:
-        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-        data = {
-            "chat_id": TELEGRAM_CHAT_ID,
-            "text": message,
-            "parse_mode": "HTML"
-        }
-        
-        response = requests.post(url, data=data)
-        
-        if response.status_code == 200:
-            print(f"✅ Telegram message sent!")
-            return True
-        else:
-            print(f"❌ Telegram failed: {response.text}")
-            return False
-    except Exception as e:
-        print(f"❌ Telegram error: {e}")
+def send_telegram(message: str, retries: int = 3) -> bool:
+    """Send message to Telegram with retry logic and HTML fallback"""
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        print("❌ Telegram credentials not configured — cannot send message")
         return False
+
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+
+    for attempt in range(1, retries + 1):
+        try:
+            # Try with HTML parse mode first
+            response = requests.post(url, data={
+                "chat_id": TELEGRAM_CHAT_ID,
+                "text": message,
+                "parse_mode": "HTML"
+            }, timeout=10)
+
+            if response.status_code == 200:
+                print(f"✅ Telegram message sent!")
+                return True
+
+            # If HTML parsing failed, retry as plain text (strip tags)
+            resp_json = response.json() if response.text else {}
+            if resp_json.get("description", "").startswith("Bad Request: can't parse"):
+                print(f"⚠️ HTML parse error, retrying as plain text")
+                plain = re.sub(r'<[^>]+>', '', message)
+                response = requests.post(url, data={
+                    "chat_id": TELEGRAM_CHAT_ID,
+                    "text": plain,
+                }, timeout=10)
+                if response.status_code == 200:
+                    print(f"✅ Telegram message sent (plain text fallback)!")
+                    return True
+
+            print(f"❌ Telegram failed (attempt {attempt}/{retries}): {response.status_code} {response.text}")
+
+        except requests.exceptions.Timeout:
+            print(f"❌ Telegram timeout (attempt {attempt}/{retries})")
+        except requests.exceptions.ConnectionError:
+            print(f"❌ Telegram connection error (attempt {attempt}/{retries})")
+        except Exception as e:
+            print(f"❌ Telegram error (attempt {attempt}/{retries}): {e}")
+
+        if attempt < retries:
+            wait = 2 ** attempt  # exponential backoff: 2s, 4s
+            print(f"   Retrying in {wait}s...")
+            time.sleep(wait)
+
+    print(f"❌ All {retries} Telegram send attempts failed")
+    return False
 
 
 # ═══════════════════════════════════════════════════════════════════════════
 # FORMAT TRADING SIGNAL
 # ═══════════════════════════════════════════════════════════════════════════
 
+def _html_escape(text: str) -> str:
+    """Escape special characters for Telegram HTML"""
+    text = str(text)
+    text = text.replace('&', '&amp;')
+    text = text.replace('<', '&lt;')
+    text = text.replace('>', '&gt;')
+    return text
+
+
 def format_signal(data: dict) -> str:
     """Format trading signal for Telegram"""
-    
-    ticker = data.get('ticker', 'UNKNOWN')
+
+    ticker = _html_escape(data.get('ticker', 'UNKNOWN'))
     signal = data.get('signal', 'UNKNOWN')
-    price = data.get('price', '0.00')
+    price = _html_escape(data.get('price', '0.00'))
     confidence = data.get('confidence', 0)
     strike = data.get('strike', 0)
     rsi = data.get('rsi', 0)
@@ -167,9 +207,12 @@ def webhook():
             data = request.get_data(as_text=True)
             if data:
                 print(f"📥 Received text data: {data}")
-                # Send as-is to Telegram
-                send_telegram(f"<b>Trading Signal:</b>\n\n{data}")
-                return jsonify({"status": "success", "message": "Text alert sent"}), 200
+                escaped = _html_escape(data)
+                sent = send_telegram(f"<b>Trading Signal:</b>\n\n{escaped}")
+                if sent:
+                    return jsonify({"status": "success", "message": "Text alert sent"}), 200
+                else:
+                    return jsonify({"status": "error", "message": "Failed to send text alert to Telegram"}), 502
             else:
                 return jsonify({"status": "error", "message": "No data received"}), 400
         
@@ -180,13 +223,20 @@ def webhook():
         
         # Format and send signal
         signal_message = format_signal(data)
-        send_telegram(signal_message)
-        
-        return jsonify({
-            "status": "success",
-            "message": "Signal processed and sent to Telegram",
-            "timestamp": datetime.now().isoformat()
-        }), 200
+        sent = send_telegram(signal_message)
+
+        if sent:
+            return jsonify({
+                "status": "success",
+                "message": "Signal processed and sent to Telegram",
+                "timestamp": datetime.now().isoformat()
+            }), 200
+        else:
+            return jsonify({
+                "status": "error",
+                "message": "Signal processed but failed to send to Telegram",
+                "timestamp": datetime.now().isoformat()
+            }), 502
         
     except Exception as e:
         print(f"❌ Error processing webhook: {e}")
