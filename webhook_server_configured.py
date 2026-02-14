@@ -32,7 +32,7 @@ if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
 # TELEGRAM NOTIFICATION
 # ═══════════════════════════════════════════════════════════════════════════
 
-def send_telegram(message: str, retries: int = 3) -> bool:
+def send_telegram(message: str, retries: int = 2) -> bool:
     """Send message to Telegram with retry logic and HTML fallback"""
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         print("❌ Telegram credentials not configured — cannot send message")
@@ -47,7 +47,7 @@ def send_telegram(message: str, retries: int = 3) -> bool:
                 "chat_id": TELEGRAM_CHAT_ID,
                 "text": message,
                 "parse_mode": "HTML"
-            }, timeout=10)
+            }, timeout=5)
 
             if response.status_code == 200:
                 print(f"✅ Telegram message sent!")
@@ -61,7 +61,7 @@ def send_telegram(message: str, retries: int = 3) -> bool:
                 response = requests.post(url, data={
                     "chat_id": TELEGRAM_CHAT_ID,
                     "text": plain,
-                }, timeout=10)
+                }, timeout=5)
                 if response.status_code == 200:
                     print(f"✅ Telegram message sent (plain text fallback)!")
                     return True
@@ -76,9 +76,8 @@ def send_telegram(message: str, retries: int = 3) -> bool:
             print(f"❌ Telegram error (attempt {attempt}/{retries}): {e}")
 
         if attempt < retries:
-            wait = 2 ** attempt  # exponential backoff: 2s, 4s
-            print(f"   Retrying in {wait}s...")
-            time.sleep(wait)
+            print(f"   Retrying in 1s...")
+            time.sleep(1)
 
     print(f"❌ All {retries} Telegram send attempts failed")
     return False
